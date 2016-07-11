@@ -6,7 +6,6 @@
 //  Copyright 2010 d3i. All rights reserved.
 //
 
-#import <DACircularProgress/DACircularProgressView.h>
 #import "MWCommon.h"
 #import "MWZoomingScrollView.h"
 #import "MWPhotoBrowser.h"
@@ -20,9 +19,8 @@
     MWPhotoBrowser __weak *_photoBrowser;
 	MWTapDetectingView *_tapView; // for background taps
 	MWTapDetectingImageView *_photoImageView;
-	DACircularProgressView *_loadingIndicator;
+    UIImageView *_loadingIndicator;
     UIImageView *_loadingError;
-    
 }
 
 @end
@@ -40,24 +38,22 @@
 		_tapView = [[MWTapDetectingView alloc] initWithFrame:self.bounds];
 		_tapView.tapDelegate = self;
 		_tapView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-		_tapView.backgroundColor = [UIColor blackColor];
 		[self addSubview:_tapView];
 		
 		// Image view
 		_photoImageView = [[MWTapDetectingImageView alloc] initWithFrame:CGRectZero];
 		_photoImageView.tapDelegate = self;
 		_photoImageView.contentMode = UIViewContentModeCenter;
-		_photoImageView.backgroundColor = [UIColor blackColor];
 		[self addSubview:_photoImageView];
-		
-		// Loading indicator
-		_loadingIndicator = [[DACircularProgressView alloc] initWithFrame:CGRectMake(140.0f, 30.0f, 40.0f, 40.0f)];
-        _loadingIndicator.userInteractionEnabled = NO;
-        _loadingIndicator.thicknessRatio = 0.1;
-        _loadingIndicator.roundedCorners = NO;
-		_loadingIndicator.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleTopMargin |
-        UIViewAutoresizingFlexibleBottomMargin | UIViewAutoresizingFlexibleRightMargin;
-		[self addSubview:_loadingIndicator];
+
+        // Loading indicator
+        _loadingIndicator = [UIImageView new];
+        _loadingIndicator.tintColor = [UIColor whiteColor];
+        _loadingIndicator.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin   |
+                                             UIViewAutoresizingFlexibleTopMargin    |
+                                             UIViewAutoresizingFlexibleBottomMargin |
+                                             UIViewAutoresizingFlexibleRightMargin;
+        [self addSubview: _loadingIndicator];
 
         // Listen progress notifications
         [[NSNotificationCenter defaultCenter] addObserver:self
@@ -66,7 +62,6 @@
                                                    object:nil];
         
 		// Setup
-		self.backgroundColor = [UIColor blackColor];
 		self.delegate = self;
 		self.showsHorizontalScrollIndicator = NO;
 		self.showsVerticalScrollIndicator = NO;
@@ -110,7 +105,8 @@
         }
     }
     _photo = photo;
-    UIImage *img = [_photoBrowser imageForPhoto:_photo];
+    id img = _photo.isAnimated ? [_photoBrowser animatedImageForPhoto: _photo]
+                               : [_photoBrowser imageForPhoto:_photo];
     if (img) {
         [self displayImage];
     } else {
@@ -120,30 +116,45 @@
 }
 
 // Get and display image
-- (void)displayImage {
-	if (_photo && _photoImageView.image == nil) {
-		
+- (void)displayImage
+{
+	if (_photo)
+    {
 		// Reset
 		self.maximumZoomScale = 1;
 		self.minimumZoomScale = 1;
 		self.zoomScale = 1;
 		self.contentSize = CGSizeMake(0, 0);
+
+        FLAnimatedImage* animatedImage = nil;
+        UIImage* img = nil;
+        if (_photo.isAnimated)
+        {
+            animatedImage = [_photoBrowser animatedImageForPhoto: _photo];
+        }
+        else
+        {
+            img = [_photoBrowser imageForPhoto:_photo];
+        }
+
 		
 		// Get image from browser as it handles ordering of fetching
-		UIImage *img = [_photoBrowser imageForPhoto:_photo];
-		if (img) {
-			
+		if (img || animatedImage)
+        {
 			// Hide indicator
 			[self hideLoadingIndicator];
 			
 			// Set image
-			_photoImageView.image = img;
+            if (_photo.isAnimated)
+                _photoImageView.animatedImage = animatedImage;
+            else
+			    _photoImageView.image = img;
 			_photoImageView.hidden = NO;
 			
 			// Setup photo frame
 			CGRect photoImageViewFrame;
 			photoImageViewFrame.origin = CGPointZero;
-			photoImageViewFrame.size = img.size;
+			photoImageViewFrame.size = _photo.isAnimated ? animatedImage.size : img.size;
 			_photoImageView.frame = photoImageViewFrame;
 			self.contentSize = photoImageViewFrame.size;
 
@@ -193,34 +204,39 @@
 #pragma mark - Loading Progress
 
 - (void)setProgressFromNotification:(NSNotification *)notification {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        NSDictionary *dict = [notification object];
-        id <MWPhoto> photoWithProgress = [dict objectForKey:@"photo"];
-        if (photoWithProgress == self.photo) {
-            float progress = [[dict valueForKey:@"progress"] floatValue];
-            _loadingIndicator.progress = MAX(MIN(1, progress), 0);
-        }
-    });
 }
 
 - (void)hideLoadingIndicator {
     _loadingIndicator.hidden = YES;
 }
 
-- (void)showLoadingIndicator {
-    self.zoomScale = 0;
-    self.minimumZoomScale = 0;
-    self.maximumZoomScale = 0;
-    _loadingIndicator.progress = 0;
-    _loadingIndicator.hidden = NO;
-    [self hideImageFailure];
+- (void) showLoadingIndicator
+{
+    UIImage* placeholder = self.photo.placeholder;
+    if (placeholder)
+    {
+        if (![_loadingIndicator.image isEqual: placeholder])
+        {
+            _loadingIndicator.image = placeholder;
+            [_loadingIndicator sizeToFit];
+            [self setNeedsLayout];
+        }
+
+        self.zoomScale = 0;
+        self.minimumZoomScale = 0;
+        self.maximumZoomScale = 0;
+        _loadingIndicator.hidden = NO;
+        [self hideImageFailure];
+    }
 }
 
 #pragma mark - Setup
 
-- (CGFloat)initialZoomScaleWithMinScale {
+- (CGFloat)initialZoomScaleWithMinScale
+{
     CGFloat zoomScale = self.minimumZoomScale;
-    if (_photoImageView && _photoBrowser.zoomPhotosToFill) {
+    if (_photoImageView && _photoBrowser.zoomPhotosToFill)
+    {
         // Zoom image to fill if the aspect ratios are fairly similar
         CGSize boundsSize = self.bounds.size;
         CGSize imageSize = _photoImageView.image.size;
@@ -229,17 +245,18 @@
         CGFloat xScale = boundsSize.width / imageSize.width;    // the scale needed to perfectly fit the image width-wise
         CGFloat yScale = boundsSize.height / imageSize.height;  // the scale needed to perfectly fit the image height-wise
         // Zooms standard portrait images on a 3.5in screen but not on a 4in screen.
-        if (ABS(boundsAR - imageAR) < 0.17) {
-            zoomScale = MAX(xScale, yScale);
+//        if (ABS(boundsAR - imageAR) < 0.17)
+        {
+            zoomScale = MIN(xScale, yScale);
             // Ensure we don't zoom in or out too far, just in case
-            zoomScale = MIN(MAX(self.minimumZoomScale, zoomScale), self.maximumZoomScale);
+//            zoomScale = MIN(MAX(self.minimumZoomScale, zoomScale), self.maximumZoomScale);
         }
     }
     return zoomScale;
 }
 
-- (void)setMaxMinZoomScalesForCurrentBounds {
-    
+- (void) setMaxMinZoomScalesForCurrentBounds
+{
     // Reset
     self.maximumZoomScale = 1;
     self.minimumZoomScale = 1;
@@ -273,18 +290,18 @@
     }
     
     // Set min/max zoom
-    self.maximumZoomScale = maxScale;
     self.minimumZoomScale = minScale;
-    
-    // Initial zoom
-    self.zoomScale = [self initialZoomScaleWithMinScale];
-    
+    CGFloat initialZoomScale = [self initialZoomScaleWithMinScale];
+    self.maximumZoomScale = fmaxf(maxScale, initialZoomScale);
+    self.minimumZoomScale = MIN(initialZoomScale, self.maximumZoomScale);
+    self.zoomScale        = initialZoomScale;
+
     // If we're zooming to fill then centralise
-    if (self.zoomScale != minScale) {
-        
+    if (self.zoomScale != self.minimumZoomScale)
+    {
         // Centralise
-        self.contentOffset = CGPointMake((imageSize.width * self.zoomScale - boundsSize.width) / 2.0,
-                                         (imageSize.height * self.zoomScale - boundsSize.height) / 2.0);
+//        self.contentOffset = CGPointMake((imageSize.width  * self.zoomScale - boundsSize.width)  / 2.0f,
+//                                         (imageSize.height * self.zoomScale - boundsSize.height) / 2.0f);
 
     }
     
@@ -316,8 +333,8 @@
                                          _loadingIndicator.frame.size.width,
                                          _loadingIndicator.frame.size.height);
 	if (_loadingError)
-        _loadingError.frame = CGRectMake(floorf((self.bounds.size.width - _loadingError.frame.size.width) / 2.),
-                                         floorf((self.bounds.size.height - _loadingError.frame.size.height) / 2),
+        _loadingError.frame = CGRectMake(floorf((self.bounds.size.width  - _loadingError.frame.size.width) / 2.0f),
+                                         floorf((self.bounds.size.height - _loadingError.frame.size.height) / 2.0f),
                                          _loadingError.frame.size.width,
                                          _loadingError.frame.size.height);
 
@@ -327,7 +344,7 @@
     // Center the image as it becomes smaller than the size of the screen
     CGSize boundsSize = self.bounds.size;
     CGRect frameToCenter = _photoImageView.frame;
-    
+
     // Horizontally
     if (frameToCenter.size.width < boundsSize.width) {
         frameToCenter.origin.x = floorf((boundsSize.width - frameToCenter.size.width) / 2.0);
@@ -341,11 +358,10 @@
 	} else {
         frameToCenter.origin.y = 0;
 	}
-    
+
 	// Center
-	if (!CGRectEqualToRect(_photoImageView.frame, frameToCenter))
+	if (!CGRectEqualToRect(_photoImageView.frame, frameToCenter) && _photoImageView.superview == self)
 		_photoImageView.frame = frameToCenter;
-	
 }
 
 #pragma mark - UIScrollViewDelegate

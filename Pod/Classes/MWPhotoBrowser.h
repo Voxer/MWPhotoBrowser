@@ -19,6 +19,7 @@
 #endif
 
 @class MWPhotoBrowser;
+@class MWZoomingScrollView;
 
 @protocol MWPhotoBrowserDelegate <NSObject>
 
@@ -34,11 +35,14 @@
 - (void)photoBrowser:(MWPhotoBrowser *)photoBrowser actionButtonPressedForPhotoAtIndex:(NSUInteger)index;
 - (BOOL)photoBrowser:(MWPhotoBrowser *)photoBrowser isPhotoSelectedAtIndex:(NSUInteger)index;
 - (void)photoBrowser:(MWPhotoBrowser *)photoBrowser photoAtIndex:(NSUInteger)index selectedChanged:(BOOL)selected;
-- (void)photoBrowserDidFinishModalPresentation:(MWPhotoBrowser *)photoBrowser;
+- (BOOL) photoBrowserShouldToggleControls:(MWPhotoBrowser *)photoBrowser;
+- (void) photoBrowserDidFinishModalPresentation:(MWPhotoBrowser *)photoBrowser;
 
 @end
 
 @interface MWPhotoBrowser : UIViewController <UIScrollViewDelegate, UIActionSheetDelegate>
+
+@property (nonatomic, strong, readonly) UIScrollView* pagingScrollView;
 
 @property (nonatomic, weak) IBOutlet id<MWPhotoBrowserDelegate> delegate;
 @property (nonatomic) BOOL zoomPhotosToFill;
@@ -71,5 +75,9 @@
 // Navigation
 - (void)showNextPhotoAnimated:(BOOL)animated;
 - (void)showPreviousPhotoAnimated:(BOOL)animated;
+
+- (id <MWPhoto>) photoAtIndex: (NSUInteger) index;
+
+- (MWZoomingScrollView*) pageDisplayedAtIndex: (NSUInteger) index;
 
 @end

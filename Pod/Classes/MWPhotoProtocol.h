@@ -8,6 +8,8 @@
 
 #import <Foundation/Foundation.h>
 
+@class FLAnimatedImage;
+
 // Notifications
 #define MWPHOTO_LOADING_DID_END_NOTIFICATION @"MWPHOTO_LOADING_DID_END_NOTIFICATION"
 #define MWPHOTO_PROGRESS_NOTIFICATION @"MWPHOTO_PROGRESS_NOTIFICATION"
@@ -31,6 +33,9 @@
 // in -loadUnderlyingImageAndNotify: which may be called by the photo browser if this
 // methods returns nil.
 @property (nonatomic, strong) UIImage *underlyingImage;
+
+@property (nonatomic, strong) UIImage *placeholder;
+
 
 // Called when the browser has determined the underlying images is not
 // already loaded into memory but needs it.
@@ -60,6 +65,11 @@
 // Video
 @property (nonatomic) BOOL isVideo;
 - (void)getVideoURL:(void (^)(NSURL *url))completion;
+
+// GIF
+@property (nonatomic, readonly) BOOL isAnimated;
+@property (nonatomic, strong)   FLAnimatedImage* animatedImage;
+
 
 // Return a caption string to be displayed over the image
 // Return nil to display no caption

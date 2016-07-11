@@ -12,12 +12,15 @@
 #import "MWPhotoBrowserPrivate.h"
 #import "SDImageCache.h"
 #import "UIImage+MWPhotoBrowser.h"
+#import "MWZoomingScrollView.h"
 
 #define PADDING                  10
 
 static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 
 @implementation MWPhotoBrowser
+
+@synthesize pagingScrollView = _pagingScrollView;
 
 #pragma mark - Init
 
@@ -154,7 +157,6 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 	_pagingScrollView.delegate = self;
 	_pagingScrollView.showsHorizontalScrollIndicator = NO;
 	_pagingScrollView.showsVerticalScrollIndicator = NO;
-	_pagingScrollView.backgroundColor = [UIColor blackColor];
     _pagingScrollView.contentSize = [self contentSizeForPagingScrollView];
 	[self.view addSubview:_pagingScrollView];
 	
@@ -702,16 +704,35 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     }
 }
 
-- (UIImage *)imageForPhoto:(id<MWPhoto>)photo {
-	if (photo) {
-		// Get image or obtain in background
-		if ([photo underlyingImage]) {
-			return [photo underlyingImage];
-		} else {
+- (UIImage*) imageForPhoto: (id <MWPhoto>) photo
+{
+    if (photo)
+    {
+        // Get image or obtain in background
+        if (photo.underlyingImage)
+        {
+            return photo.underlyingImage;
+        }
+        else
+        {
             [photo loadUnderlyingImageAndNotify];
-		}
-	}
-	return nil;
+            return photo.underlyingImage;
+        }
+    }
+    return nil;
+}
+
+- (FLAnimatedImage*)animatedImageForPhoto:(id<MWPhoto>)photo
+{
+    if (photo) {
+   		// Get image or obtain in background
+   		if ([photo animatedImage]) {
+   			return [photo animatedImage];
+   		} else {
+               [photo loadUnderlyingImageAndNotify];
+   		}
+   	}
+   	return nil;
 }
 
 - (void)loadAdjacentPhotosIfNecessary:(id<MWPhoto>)photo {
@@ -742,15 +763,20 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 
 #pragma mark - MWPhoto Loading Notification
 
-- (void)handleMWPhotoLoadingDidEndNotification:(NSNotification *)notification {
+- (void)handleMWPhotoLoadingDidEndNotification:(NSNotification *)notification
+{
     id <MWPhoto> photo = [notification object];
     MWZoomingScrollView *page = [self pageDisplayingPhoto:photo];
-    if (page) {
-        if ([photo underlyingImage]) {
+    if (page)
+    {
+        if ((photo.isAnimated && photo.animatedImage) || (!photo.isAnimated && photo.underlyingImage))
+        {
             // Successful load
             [page displayImage];
             [self loadAdjacentPhotosIfNecessary:photo];
-        } else {
+        }
+        else
+        {
             
             // Failed to load
             [page displayImageFailure];
@@ -1391,8 +1417,6 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
         if (!_isVCBasedStatusBarAppearance) {
             
             // Non-view controller based
-            [[UIApplication sharedApplication] setStatusBarHidden:hidden withAnimation:animated ? UIStatusBarAnimationSlide : UIStatusBarAnimationNone];
-            
         } else {
             
             // View controller based so animate away
@@ -1503,7 +1527,12 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 - (BOOL)areControlsHidden { return (_toolbar.alpha == 0); }
 - (void)hideControls { [self setControlsHidden:YES animated:YES permanent:NO]; }
 - (void)showControls { [self setControlsHidden:NO animated:YES permanent:NO]; }
-- (void)toggleControls { [self setControlsHidden:![self areControlsHidden] animated:YES permanent:NO]; }
+- (void)toggleControls
+{
+    if ([self.delegate respondsToSelector: @selector(photoBrowserShouldToggleControls:)] && ![self.delegate photoBrowserShouldToggleControls: self])
+        return;
+
+    [self setControlsHidden:![self areControlsHidden] animated:YES permanent:NO]; }
 
 #pragma mark - Properties
 
