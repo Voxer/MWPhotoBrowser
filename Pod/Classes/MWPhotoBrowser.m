@@ -722,14 +722,19 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     return nil;
 }
 
-- (FLAnimatedImage*)animatedImageForPhoto:(id<MWPhoto>)photo
+- (FLAnimatedImage*) animatedImageForPhoto: (id <MWPhoto>) photo
 {
-    if (photo) {
+    if (photo)
+    {
    		// Get image or obtain in background
-   		if ([photo animatedImage]) {
+   		if ([photo animatedImage])
+        {
    			return [photo animatedImage];
-   		} else {
-               [photo loadUnderlyingImageAndNotify];
+   		}
+        else
+        {
+            [photo loadUnderlyingImageAndNotify];
+            return photo.animatedImage;
    		}
    	}
    	return nil;
